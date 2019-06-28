@@ -7,3 +7,4 @@
 .vscode/settings.json
 .vscode/extensions.json
 .vscode/arduino.json
+mpu6050_esp_osc.code-workspace
