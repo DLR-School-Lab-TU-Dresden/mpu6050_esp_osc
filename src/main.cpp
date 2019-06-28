@@ -77,6 +77,41 @@ MPU6050 mpu;
    pin.
  * ========================================================================= */
 
+// uncomment "OUTPUT_READABLE_QUATERNION" if you want to see the actual
+// quaternion components in a [w, x, y, z] format (not best for parsing
+// on a remote host such as Processing or something though)
+//#define OUTPUT_READABLE_QUATERNION
+
+// uncomment "OUTPUT_READABLE_EULER" if you want to see Euler angles
+// (in degrees) calculated from the quaternions coming from the FIFO.
+// Note that Euler angles suffer from gimbal lock (for more info, see
+// http://en.wikipedia.org/wiki/Gimbal_lock)
+//#define OUTPUT_READABLE_EULER
+
+// uncomment "OUTPUT_READABLE_YAWPITCHROLL" if you want to see the yaw/
+// pitch/roll angles (in degrees) calculated from the quaternions coming
+// from the FIFO. Note this also requires gravity vector calculations.
+// Also note that yaw/pitch/roll angles suffer from gimbal lock (for
+// more info, see: http://en.wikipedia.org/wiki/Gimbal_lock)
+#define OUTPUT_READABLE_YAWPITCHROLL
+
+// uncomment "OUTPUT_READABLE_REALACCEL" if you want to see acceleration
+// components with gravity removed. This acceleration reference frame is
+// not compensated for orientation, so +X is always +X according to the
+// sensor, just without the effects of gravity. If you want acceleration
+// compensated for orientation, us OUTPUT_READABLE_WORLDACCEL instead.
+//#define OUTPUT_READABLE_REALACCEL
+
+// uncomment "OUTPUT_READABLE_WORLDACCEL" if you want to see acceleration
+// components with gravity removed and adjusted for the world frame of
+// reference (yaw is relative to initial orientation, since no magnetometer
+// is present in this case). Could be quite handy in some cases.
+//#define OUTPUT_READABLE_WORLDACCEL
+
+// uncomment "OUTPUT_TEAPOT_OSC" if you want output that matches the
+// format used for the InvenSense teapot demo
+//#define OUTPUT_TEAPOT_OSC
+
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
 uint8_t mpuIntStatus;   // holds actual interrupt status byte from MPU
@@ -98,47 +133,12 @@ float euler[3];         // [psi, theta, phi]    Euler angle container
 float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
 #endif
 
-// uncomment "OUTPUT_READABLE_QUATERNION" if you want to see the actual
-// quaternion components in a [w, x, y, z] format (not best for parsing
-// on a remote host such as Processing or something though)
-//#define OUTPUT_READABLE_QUATERNION
-
-// uncomment "OUTPUT_READABLE_EULER" if you want to see Euler angles
-// (in degrees) calculated from the quaternions coming from the FIFO.
-// Note that Euler angles suffer from gimbal lock (for more info, see
-// http://en.wikipedia.org/wiki/Gimbal_lock)
-//#define OUTPUT_READABLE_EULER
-
-// uncomment "OUTPUT_READABLE_YAWPITCHROLL" if you want to see the yaw/
-// pitch/roll angles (in degrees) calculated from the quaternions coming
-// from the FIFO. Note this also requires gravity vector calculations.
-// Also note that yaw/pitch/roll angles suffer from gimbal lock (for
-// more info, see: http://en.wikipedia.org/wiki/Gimbal_lock)
-//#define OUTPUT_READABLE_YAWPITCHROLL
-
-// uncomment "OUTPUT_READABLE_REALACCEL" if you want to see acceleration
-// components with gravity removed. This acceleration reference frame is
-// not compensated for orientation, so +X is always +X according to the
-// sensor, just without the effects of gravity. If you want acceleration
-// compensated for orientation, us OUTPUT_READABLE_WORLDACCEL instead.
-//#define OUTPUT_READABLE_REALACCEL
-
-// uncomment "OUTPUT_READABLE_WORLDACCEL" if you want to see acceleration
-// components with gravity removed and adjusted for the world frame of
-// reference (yaw is relative to initial orientation, since no magnetometer
-// is present in this case). Could be quite handy in some cases.
-//#define OUTPUT_READABLE_WORLDACCEL
-
-// uncomment "OUTPUT_TEAPOT_OSC" if you want output that matches the
-// format used for the InvenSense teapot demo
-#define OUTPUT_TEAPOT_OSC
-
 #define INTERRUPT_PIN 15 // use pin 15 on ESP8266
 
 const char DEVICE_NAME[] = "mpu6050";
 
 WiFiUDP Udp;                                // A UDP instance to let us send and receive packets over UDP
-const IPAddress outIp(192, 168, 1, 11);     // remote IP to receive OSC
+const IPAddress outIp(192, 168, 1, 101);     // remote IP to receive OSC
 const unsigned int outPort = 9999;          // remote port to receive OSC
 
 // ================================================================
@@ -174,10 +174,10 @@ void mpu_setup()
   devStatus = mpu.dmpInitialize();
 
   // supply your own gyro offsets here, scaled for min sensitivity
-  mpu.setXGyroOffset(220);
-  mpu.setYGyroOffset(76);
-  mpu.setZGyroOffset(-85);
-  mpu.setZAccelOffset(1788); // 1688 factory default for my test chip
+  mpu.setXGyroOffset(42);
+  mpu.setYGyroOffset(-60);
+  mpu.setZGyroOffset(51);
+  mpu.setZAccelOffset(801); // 1688 factory default for my test chip
 
   // make sure it worked (returns 0 if so)
   if (devStatus == 0) {
@@ -205,6 +205,60 @@ void mpu_setup()
     Serial.print(devStatus);
     Serial.println(F(")"));
   }
+}
+
+void sendRenoiseAccordOn(int note, IPAddress outIp, int outPort) {
+  OSCMessage msg("/renoise/trigger/note_on");
+  msg.add((int)1).add((int)1).add(note).add((int)127);
+  Udp.beginPacket(outIp, outPort);
+  msg.send(Udp);
+  Udp.endPacket();
+  msg.empty();
+}
+
+void sendRenoiseNoteOff(int note, IPAddress outIp, int outPort) {  
+  OSCMessage msg("/renoise/trigger/note_off");
+  msg.add((int)1).add((int)1).add(note);
+  Udp.beginPacket(outIp, outPort);
+  msg.send(Udp);
+  Udp.endPacket();
+  msg.empty();
+}  
+
+void generateDur(int cadence) {
+  Serial.print("Dur");
+  int note = 36;
+  int terz = 40;
+  int quinte = 43;
+  sendRenoiseAccordOn(note, outIp, outPort);
+  sendRenoiseAccordOn(terz, outIp, outPort);
+  sendRenoiseAccordOn(quinte, outIp, outPort);
+  delay(500);
+  sendRenoiseNoteOff(note, outIp, outPort);
+  sendRenoiseNoteOff(terz, outIp, outPort);
+  sendRenoiseNoteOff(quinte, outIp, outPort);
+  delay(500);
+  
+  //sendRenoiseAccordOn(terz);
+  //sendRenoiseAccordOn(quinte);
+}
+
+void generateMoll(int cadence) {
+  Serial.print("Moll");
+  int note = 36;
+  int terz = 39;
+  int quinte = 43;
+  sendRenoiseAccordOn(note, outIp, outPort);
+  sendRenoiseAccordOn(terz, outIp, outPort);
+  sendRenoiseAccordOn(quinte, outIp, outPort);
+  delay(500);
+  sendRenoiseNoteOff(note, outIp, outPort);
+  sendRenoiseNoteOff(terz, outIp, outPort);
+  sendRenoiseNoteOff(quinte, outIp, outPort);
+  delay(500);
+  
+  //sendRenoiseAccordOn(terz);
+  //sendRenoiseAccordOn(quinte);
 }
 
 void setup(void)
@@ -317,6 +371,17 @@ void mpu_loop()
     Serial.print(ypr[1] * 180/M_PI);
     Serial.print("\t");
     Serial.println(ypr[2] * 180/M_PI);
+
+    // Dur/Moll
+  float angle[3];
+  angle[1] = ypr[1] * 180/M_PI;
+
+    if (angle[1] >= 45.0 && angle[1] < 135) {
+      generateDur(0);
+    } 
+    if (angle[1] >= -45.0 && angle[1] < 45.0) {
+      generateMoll(0);
+    }
 #endif
 
 #ifdef OUTPUT_READABLE_REALACCEL
