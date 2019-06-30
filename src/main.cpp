@@ -64,6 +64,16 @@ THE SOFTWARE.
     #include "Wire.h"
 #endif
 
+// Skip connecting to WiFi for faster debugging
+const bool DEBUG_OFFLINE = true;
+
+// Tonic note for cadence
+int keynote = 36; // c2
+
+// Threshold value for distinction between NoteOn/NoteOff
+// Active angle = angle +- angleThreshold
+const int angleThreshold = 45;
+
 // class default I2C address is 0x68
 // specific I2C addresses may be passed as a parameter here
 // AD0 low = 0x68 (default for SparkFun breakout and InvenSense evaluation board)
@@ -207,60 +217,6 @@ void mpu_setup()
   }
 }
 
-void sendRenoiseAccordOn(int note, IPAddress outIp, int outPort) {
-  OSCMessage msg("/renoise/trigger/note_on");
-  msg.add((int)1).add((int)1).add(note).add((int)127);
-  Udp.beginPacket(outIp, outPort);
-  msg.send(Udp);
-  Udp.endPacket();
-  msg.empty();
-}
-
-void sendRenoiseNoteOff(int note, IPAddress outIp, int outPort) {  
-  OSCMessage msg("/renoise/trigger/note_off");
-  msg.add((int)1).add((int)1).add(note);
-  Udp.beginPacket(outIp, outPort);
-  msg.send(Udp);
-  Udp.endPacket();
-  msg.empty();
-}  
-
-void generateDur(int cadence) {
-  Serial.print("Dur");
-  int note = 36;
-  int terz = 40;
-  int quinte = 43;
-  sendRenoiseAccordOn(note, outIp, outPort);
-  sendRenoiseAccordOn(terz, outIp, outPort);
-  sendRenoiseAccordOn(quinte, outIp, outPort);
-  delay(500);
-  sendRenoiseNoteOff(note, outIp, outPort);
-  sendRenoiseNoteOff(terz, outIp, outPort);
-  sendRenoiseNoteOff(quinte, outIp, outPort);
-  delay(500);
-  
-  //sendRenoiseAccordOn(terz);
-  //sendRenoiseAccordOn(quinte);
-}
-
-void generateMoll(int cadence) {
-  Serial.print("Moll");
-  int note = 36;
-  int terz = 39;
-  int quinte = 43;
-  sendRenoiseAccordOn(note, outIp, outPort);
-  sendRenoiseAccordOn(terz, outIp, outPort);
-  sendRenoiseAccordOn(quinte, outIp, outPort);
-  delay(500);
-  sendRenoiseNoteOff(note, outIp, outPort);
-  sendRenoiseNoteOff(terz, outIp, outPort);
-  sendRenoiseNoteOff(quinte, outIp, outPort);
-  delay(500);
-  
-  //sendRenoiseAccordOn(terz);
-  //sendRenoiseAccordOn(quinte);
-}
-
 void setup(void)
 {
   Serial.begin(115200);
@@ -275,21 +231,32 @@ void setup(void)
   //fetches ssid and pass from eeprom and tries to connect
   //if it does not connect it starts an access point with the specified name
   //and goes into a blocking loop awaiting configuration
-  wifiManager.autoConnect(DEVICE_NAME);
+  if (!DEBUG_OFFLINE) {
+    wifiManager.autoConnect(DEVICE_NAME);
 
-  Serial.print(F("WiFi connected! IP address: "));
-  Serial.println(WiFi.localIP());
+    Serial.print(F("WiFi connected! IP address: "));
+    Serial.println(WiFi.localIP());
+  }
+  else {
+    Serial.println("Offline debug mode. Not going to try to establish WiFi connection.");
+  }
 
   mpu_setup();
 }
 
-void mpu_loop()
+/*
+  Acquires MPU sensor data.
+  Returns, whether new sensor data could be obtained (true)
+  or not (false).
+*/
+bool mpu_loop()
 {
+  bool newDataObtained;
   // if programming failed, don't try to do anything
-  if (!dmpReady) return;
+  if (!dmpReady) return false;
 
   // wait for MPU interrupt or extra packet(s) available
-  if (!mpuInterrupt && fifoCount < packetSize) return;
+  if (!mpuInterrupt && fifoCount < packetSize) return false;
 
   // reset interrupt flag and get INT_STATUS byte
   mpuInterrupt = false;
@@ -303,6 +270,8 @@ void mpu_loop()
     // reset so we can continue cleanly
     mpu.resetFIFO();
     Serial.println(F("FIFO overflow!"));
+    
+    return false;
 
     // otherwise, check for DMP data ready interrupt (this should happen frequently)
   } else if (mpuIntStatus & 0x02) {
@@ -365,23 +334,13 @@ void mpu_loop()
     mpu.dmpGetQuaternion(&q, fifoBuffer);
     mpu.dmpGetGravity(&gravity, &q);
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-    Serial.print("ypr\t");
-    Serial.print(ypr[0] * 180/M_PI);
-    Serial.print("\t");
-    Serial.print(ypr[1] * 180/M_PI);
-    Serial.print("\t");
-    Serial.println(ypr[2] * 180/M_PI);
-
-    // Dur/Moll
-  float angle[3];
-  angle[1] = ypr[1] * 180/M_PI;
-
-    if (angle[1] >= 45.0 && angle[1] < 135) {
-      generateDur(0);
-    } 
-    if (angle[1] >= -45.0 && angle[1] < 45.0) {
-      generateMoll(0);
-    }
+    //Serial.print("ypr\t");
+    //Serial.print(ypr[0] * 180/M_PI);
+    //Serial.print("\t");
+    //Serial.print(ypr[1] * 180/M_PI);
+    //Serial.print("\t");
+    //Serial.println(ypr[2] * 180/M_PI);
+    newDataObtained = true;
 #endif
 
 #ifdef OUTPUT_READABLE_REALACCEL
@@ -413,6 +372,100 @@ void mpu_loop()
     Serial.print("\t");
     Serial.println(aaWorld.z);
 #endif
+
+    return newDataObtained;
+  }
+  return false;
+}
+
+/* 
+  Convert YPR data into angles
+  between -180° and +180°.
+
+  For passing arrays, see: https://stackoverflow.com/questions/11656532/returning-an-array-using-c
+*/
+float *calcAngles(float *yprData) {
+  static float yprAngles[3]; // do not destroy array after return statement
+  for (int i = 0; i <= 3; i++)
+    yprAngles[i] = yprData[i] * 180/M_PI;
+
+  return yprAngles; // return pointer to angle data
+}
+
+/*
+  Detect triad of the cadence from yaw/pitch/roll angle.
+*/
+char *detectTriad(float *angles) {
+  static char triad[3];
+  // 1. T: Tonic (Tonika, Dur)
+  // YPR x == 90, y == 90, z == 0
+  if ((angles[0] >= 90.0-angleThreshold && angles[0] < 90.0+angleThreshold) && (angles[1] >= 90.0-angleThreshold && angles[1] < 90.0+angleThreshold) && (angles[2] >= 0.0-angleThreshold && angles[2] < 0.0+angleThreshold)) {
+    strcpy(triad, "T");
+    return triad;
+  }
+
+  // 2. Sp: Supertonic (Subdominantparallele, Moll)
+  // 3. Dp: Mediant (Dominantparallele, Moll)
+  // 4. S: Subdominant (Subdominante, Dur)
+  // 5. D: Dominant (Dominante, Dur)
+
+  // 6. Tp: Submediant (Tonikaparallele, Moll)
+  // YPR x == 90, y == 0, z == 0
+  else if ((angles[0] >= 90.0-angleThreshold && angles[0] < 90.0+angleThreshold) && (angles[1] >= 0.0-angleThreshold && angles[1] < 0.0+angleThreshold) && (angles[2] >= 0.0-angleThreshold && angles[2] < 0.0+angleThreshold)) {
+    strcpy(triad, "Tp");
+    return triad;
+  }
+  else
+    strcpy(triad, "0");
+    return triad;
+}
+
+void sendRenoiseNoteOn(int note, IPAddress outIp, int outPort) {
+  OSCMessage msg("/renoise/trigger/note_on");
+  msg.add((int)1).add((int)1).add(note).add((int)127);
+  Udp.beginPacket(outIp, outPort);
+  msg.send(Udp);
+  Udp.endPacket();
+  msg.empty();
+}
+
+void sendRenoiseNoteOff(int note, IPAddress outIp, int outPort) {  
+  OSCMessage msg("/renoise/trigger/note_off");
+  msg.add((int)1).add((int)1).add(note);
+  Udp.beginPacket(outIp, outPort);
+  msg.send(Udp);
+  Udp.endPacket();
+  msg.empty();
+}  
+
+/*
+  Send triad as OSC messages to ReNoise.
+*/
+void sendTriad(char *triad, bool noteOn) {
+  int first, third, fifth;
+  // 1. T: Tonic (Tonika, Dur)
+  if (strcmp(triad, "T") == 0) {
+    first = keynote + 12;
+    third = keynote + 4;
+    fifth = keynote + 7;
+  }
+  // 6. Tp: Submediant (Tonikaparallele, Moll)
+  else if (strcmp(triad, "Tp") == 0) {
+    first = keynote + 9;
+    third = keynote;
+    fifth = keynote + 4;
+  }
+
+  // Send OSC messages
+  if (noteOn) {
+    sendRenoiseNoteOn(first, outIp, outPort);
+    sendRenoiseNoteOn(third, outIp, outPort);
+    sendRenoiseNoteOn(fifth, outIp, outPort);
+  }
+  else {
+    sendRenoiseNoteOff(first, outIp, outPort);
+    sendRenoiseNoteOff(third, outIp, outPort);
+    sendRenoiseNoteOff(fifth, outIp, outPort);
   }
 }
 
@@ -422,14 +475,50 @@ void mpu_loop()
     should go here)
 */
 /**************************************************************************/
-void loop(void)
-{
-  if (WiFi.status() != WL_CONNECTED) {
+
+bool firstLoop = true;
+char previousTriad[3];
+
+void loop(void) {
+
+  // Connect to WiFi network
+  if (WiFi.status() != WL_CONNECTED && !DEBUG_OFFLINE) {
     Serial.println();
     Serial.println("*** Disconnected from AP so rebooting ***");
     Serial.println();
     ESP.reset();
   }
 
-  mpu_loop();
+  // Check for new MPU data
+  while (mpu_loop() == false) {
+    //Serial.println("Waiting for new MPU data...");
+  }
+
+  // Analyze MPU raw data
+  float *mpuAngles = calcAngles(ypr);
+  char *triad = detectTriad(mpuAngles);
+  if (!firstLoop) {
+    sendTriad(previousTriad, false); // mute previous triad
+  }
+
+  // Check whether MPU is in off position
+  if (strcmp(triad, "0") != 0) { // on position
+    sendTriad(triad, true); // play new triad
+  }
+  else { // off position
+    sendTriad(triad, false);
+  }
+
+  strcpy(previousTriad, triad);
+
+  // Print raw data and cadence results
+  Serial.print("ypr\t");
+  for (int i = 0; i <= 2; i++) {
+    Serial.print(mpuAngles[i]);
+    Serial.print("\t");
+  }
+  Serial.println(triad);
+
+  //delay(100); // Too long delays cause "FIFO overflow" in mpu_loop() function
+  firstLoop = false;
 }
