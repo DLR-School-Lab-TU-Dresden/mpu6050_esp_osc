@@ -64,6 +64,9 @@ THE SOFTWARE.
     #include "Wire.h"
 #endif
 
+// Skip connecting to WiFi for faster debugging
+const bool DEBUG_OFFLINE = true;
+
 // class default I2C address is 0x68
 // specific I2C addresses may be passed as a parameter here
 // AD0 low = 0x68 (default for SparkFun breakout and InvenSense evaluation board)
@@ -221,21 +224,32 @@ void setup(void)
   //fetches ssid and pass from eeprom and tries to connect
   //if it does not connect it starts an access point with the specified name
   //and goes into a blocking loop awaiting configuration
-  wifiManager.autoConnect(DEVICE_NAME);
+  if (!DEBUG_OFFLINE) {
+    wifiManager.autoConnect(DEVICE_NAME);
 
-  Serial.print(F("WiFi connected! IP address: "));
-  Serial.println(WiFi.localIP());
+    Serial.print(F("WiFi connected! IP address: "));
+    Serial.println(WiFi.localIP());
+  }
+  else {
+    Serial.println("Offline debug mode. Not going to try to establish WiFi connection.");
+  }
 
   mpu_setup();
 }
 
-void mpu_loop()
+/*
+  Acquires MPU sensor data.
+  Returns, whether new sensor data could be obtained (true)
+  or not (false).
+*/
+bool mpu_loop()
 {
+  bool newDataObtained;
   // if programming failed, don't try to do anything
-  if (!dmpReady) return;
+  if (!dmpReady) return false;
 
   // wait for MPU interrupt or extra packet(s) available
-  if (!mpuInterrupt && fifoCount < packetSize) return;
+  if (!mpuInterrupt && fifoCount < packetSize) return false;
 
   // reset interrupt flag and get INT_STATUS byte
   mpuInterrupt = false;
@@ -249,6 +263,8 @@ void mpu_loop()
     // reset so we can continue cleanly
     mpu.resetFIFO();
     Serial.println(F("FIFO overflow!"));
+    
+    return false;
 
     // otherwise, check for DMP data ready interrupt (this should happen frequently)
   } else if (mpuIntStatus & 0x02) {
@@ -311,12 +327,13 @@ void mpu_loop()
     mpu.dmpGetQuaternion(&q, fifoBuffer);
     mpu.dmpGetGravity(&gravity, &q);
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-    Serial.print("ypr\t");
-    Serial.print(ypr[0] * 180/M_PI);
-    Serial.print("\t");
-    Serial.print(ypr[1] * 180/M_PI);
-    Serial.print("\t");
-    Serial.println(ypr[2] * 180/M_PI);
+    //Serial.print("ypr\t");
+    //Serial.print(ypr[0] * 180/M_PI);
+    //Serial.print("\t");
+    //Serial.print(ypr[1] * 180/M_PI);
+    //Serial.print("\t");
+    //Serial.println(ypr[2] * 180/M_PI);
+    newDataObtained = true;
 #endif
 
 #ifdef OUTPUT_READABLE_REALACCEL
@@ -348,11 +365,18 @@ void mpu_loop()
     Serial.print("\t");
     Serial.println(aaWorld.z);
 #endif
+
+    return newDataObtained;
   }
+  return false;
 }
 
-// Convert YPR data into angles
-// between -180° and +180°
+/* 
+  Convert YPR data into angles
+  between -180° and +180°
+
+  For passing arrays, see: https://stackoverflow.com/questions/11656532/returning-an-array-using-c
+*/
 float *calcAngles(float *yprData) {
   static float yprAngles[3]; // do not destroy array after return statement
   for (int i = 0; i <= 3; i++)
@@ -360,8 +384,31 @@ float *calcAngles(float *yprData) {
   return yprAngles; // return pointer to angle data
 }
 
-void detectCadence(float *angle) {
+/*
+  Detect triad of the cadence from yaw/pitch/roll angle.
+*/
+char *detectTriad(float *angles) {
+  static char triad[3];
+  // 1. T: Tonic (Tonika, Dur)
+  // YPR x == 90, y == 90, z == 0
+  if (angles[1] >= 45.0 && angles[1] < 135.0) {
+    strcpy(triad, "T");
+    return triad;
+  }
 
+  // 2. Sp: Supertonic (Subdominantparallele, Moll)
+  // 3. Dp: Mediant (Dominantparallele, Moll)
+  // 4. S: Subdominant (Subdominante, Dur)
+  // 5. D: Dominant (Dominante, Dur)
+
+  // 6. Tp: Submediant (Tonikaparallele, Moll)
+  // YPR x == 90, y == 0, z == 0
+  else if (angles[1] >= -45.0 && angles[1] < 45.0) {
+    strcpy(triad, "Tp");
+    return triad;
+  }
+  else
+    return 0;
 }
 
 void sendRenoiseNoteOn(int note, IPAddress outIp, int outPort) {
@@ -421,28 +468,35 @@ void generateMoll(int cadence) {
     should go here)
 */
 /**************************************************************************/
-void loop(void)
-{
-  if (WiFi.status() != WL_CONNECTED) {
+
+int basicTonality = 36; // c2
+
+void loop(void) {
+
+  // Connect to WiFi network
+  if (WiFi.status() != WL_CONNECTED && !DEBUG_OFFLINE) {
     Serial.println();
     Serial.println("*** Disconnected from AP so rebooting ***");
     Serial.println();
     ESP.reset();
   }
 
-  mpu_loop();
+  // Check for new MPU data
+  while (mpu_loop() == false) {
+    //Serial.println("Waiting for new MPU data...");
+  }
 
+  // Analyze MPU raw data
   float *mpuAngles = calcAngles(ypr);
+  char *triad = detectTriad(mpuAngles);
 
-  detectCadence(mpuAngles);
-  // Dur/Moll
+  // Print raw data and cadence results
+  Serial.print("ypr\t");
+  for (int i = 0; i <= 3; i++) {
+    Serial.print(mpuAngles[i]);
+    Serial.print("\t");
+  }
+  Serial.println(triad);
 
-  // YPR x == ??, y == 90, z == ??
-  if (mpuAngles[1] >= 45.0 && mpuAngles[1] < 135.0) {
-    generateDur(0);
-  }
-  // YPR x == ??, y == 0, z == ??
-  if (mpuAngles[1] >= -45.0 && mpuAngles[1] < 45.0) {
-    generateMoll(0);
-  }
+  //delay(100); // Too long delays cause "FIFO overflow" in mpu_loop() function
 }
