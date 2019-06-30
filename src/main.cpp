@@ -67,6 +67,13 @@ THE SOFTWARE.
 // Skip connecting to WiFi for faster debugging
 const bool DEBUG_OFFLINE = true;
 
+// Tonic note for cadence
+int keynote = 36; // c2
+
+// Threshold value for distinction between NoteOn/NoteOff
+// Active angle = angle +- angleThreshold
+const int angleThreshold = 45;
+
 // class default I2C address is 0x68
 // specific I2C addresses may be passed as a parameter here
 // AD0 low = 0x68 (default for SparkFun breakout and InvenSense evaluation board)
@@ -373,7 +380,7 @@ bool mpu_loop()
 
 /* 
   Convert YPR data into angles
-  between -180° and +180°
+  between -180° and +180°.
 
   For passing arrays, see: https://stackoverflow.com/questions/11656532/returning-an-array-using-c
 */
@@ -381,6 +388,7 @@ float *calcAngles(float *yprData) {
   static float yprAngles[3]; // do not destroy array after return statement
   for (int i = 0; i <= 3; i++)
     yprAngles[i] = yprData[i] * 180/M_PI;
+
   return yprAngles; // return pointer to angle data
 }
 
@@ -391,7 +399,7 @@ char *detectTriad(float *angles) {
   static char triad[3];
   // 1. T: Tonic (Tonika, Dur)
   // YPR x == 90, y == 90, z == 0
-  if (angles[1] >= 45.0 && angles[1] < 135.0) {
+  if ((angles[0] >= 90.0-angleThreshold && angles[0] < 90.0+angleThreshold) && (angles[1] >= 90.0-angleThreshold && angles[1] < 90.0+angleThreshold) && (angles[2] >= 0.0-angleThreshold && angles[2] < 0.0+angleThreshold)) {
     strcpy(triad, "T");
     return triad;
   }
@@ -403,12 +411,13 @@ char *detectTriad(float *angles) {
 
   // 6. Tp: Submediant (Tonikaparallele, Moll)
   // YPR x == 90, y == 0, z == 0
-  else if (angles[1] >= -45.0 && angles[1] < 45.0) {
+  else if ((angles[0] >= 90.0-angleThreshold && angles[0] < 90.0+angleThreshold) && (angles[1] >= 0.0-angleThreshold && angles[1] < 0.0+angleThreshold) && (angles[2] >= 0.0-angleThreshold && angles[2] < 0.0+angleThreshold)) {
     strcpy(triad, "Tp");
     return triad;
   }
   else
-    return 0;
+    strcpy(triad, "0");
+    return triad;
 }
 
 void sendRenoiseNoteOn(int note, IPAddress outIp, int outPort) {
@@ -429,37 +438,35 @@ void sendRenoiseNoteOff(int note, IPAddress outIp, int outPort) {
   msg.empty();
 }  
 
-void generateDur(int cadence) {
-  Serial.print("Dur");
-  int note = 36;
-  int terz = 40;
-  int quinte = 43;
-  sendRenoiseNoteOn(note, outIp, outPort);
-  sendRenoiseNoteOn(terz, outIp, outPort);
-  sendRenoiseNoteOn(quinte, outIp, outPort);
-  delay(500);
-  sendRenoiseNoteOff(note, outIp, outPort);
-  sendRenoiseNoteOff(terz, outIp, outPort);
-  sendRenoiseNoteOff(quinte, outIp, outPort);
-  delay(500);
-  
-  //sendRenoiseAccordOn(terz);
-  //sendRenoiseAccordOn(quinte);
-}
+/*
+  Send triad as OSC messages to ReNoise.
+*/
+void sendTriad(char *triad, bool noteOn) {
+  int first, third, fifth;
+  // 1. T: Tonic (Tonika, Dur)
+  if (strcmp(triad, "T") == 0) {
+    first = keynote + 12;
+    third = keynote + 4;
+    fifth = keynote + 7;
+  }
+  // 6. Tp: Submediant (Tonikaparallele, Moll)
+  else if (strcmp(triad, "Tp") == 0) {
+    first = keynote + 9;
+    third = keynote;
+    fifth = keynote + 4;
+  }
 
-void generateMoll(int cadence) {
-  Serial.print("Moll");
-  int note = 36;
-  int terz = 39;
-  int quinte = 43;
-  sendRenoiseNoteOn(note, outIp, outPort);
-  sendRenoiseNoteOn(terz, outIp, outPort);
-  sendRenoiseNoteOn(quinte, outIp, outPort);
-  delay(500);
-  sendRenoiseNoteOff(note, outIp, outPort);
-  sendRenoiseNoteOff(terz, outIp, outPort);
-  sendRenoiseNoteOff(quinte, outIp, outPort);
-  delay(500);
+  // Send OSC messages
+  if (noteOn) {
+    sendRenoiseNoteOn(first, outIp, outPort);
+    sendRenoiseNoteOn(third, outIp, outPort);
+    sendRenoiseNoteOn(fifth, outIp, outPort);
+  }
+  else {
+    sendRenoiseNoteOff(first, outIp, outPort);
+    sendRenoiseNoteOff(third, outIp, outPort);
+    sendRenoiseNoteOff(fifth, outIp, outPort);
+  }
 }
 
 /**************************************************************************/
@@ -469,7 +476,8 @@ void generateMoll(int cadence) {
 */
 /**************************************************************************/
 
-int basicTonality = 36; // c2
+bool firstLoop = true;
+char previousTriad[3];
 
 void loop(void) {
 
@@ -489,14 +497,28 @@ void loop(void) {
   // Analyze MPU raw data
   float *mpuAngles = calcAngles(ypr);
   char *triad = detectTriad(mpuAngles);
+  if (!firstLoop) {
+    sendTriad(previousTriad, false); // mute previous triad
+  }
+
+  // Check whether MPU is in off position
+  if (strcmp(triad, "0") != 0) { // on position
+    sendTriad(triad, true); // play new triad
+  }
+  else { // off position
+    sendTriad(triad, false);
+  }
+
+  strcpy(previousTriad, triad);
 
   // Print raw data and cadence results
   Serial.print("ypr\t");
-  for (int i = 0; i <= 3; i++) {
+  for (int i = 0; i <= 2; i++) {
     Serial.print(mpuAngles[i]);
     Serial.print("\t");
   }
   Serial.println(triad);
 
   //delay(100); // Too long delays cause "FIFO overflow" in mpu_loop() function
+  firstLoop = false;
 }
