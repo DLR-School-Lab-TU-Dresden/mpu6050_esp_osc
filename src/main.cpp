@@ -207,60 +207,6 @@ void mpu_setup()
   }
 }
 
-void sendRenoiseAccordOn(int note, IPAddress outIp, int outPort) {
-  OSCMessage msg("/renoise/trigger/note_on");
-  msg.add((int)1).add((int)1).add(note).add((int)127);
-  Udp.beginPacket(outIp, outPort);
-  msg.send(Udp);
-  Udp.endPacket();
-  msg.empty();
-}
-
-void sendRenoiseNoteOff(int note, IPAddress outIp, int outPort) {  
-  OSCMessage msg("/renoise/trigger/note_off");
-  msg.add((int)1).add((int)1).add(note);
-  Udp.beginPacket(outIp, outPort);
-  msg.send(Udp);
-  Udp.endPacket();
-  msg.empty();
-}  
-
-void generateDur(int cadence) {
-  Serial.print("Dur");
-  int note = 36;
-  int terz = 40;
-  int quinte = 43;
-  sendRenoiseAccordOn(note, outIp, outPort);
-  sendRenoiseAccordOn(terz, outIp, outPort);
-  sendRenoiseAccordOn(quinte, outIp, outPort);
-  delay(500);
-  sendRenoiseNoteOff(note, outIp, outPort);
-  sendRenoiseNoteOff(terz, outIp, outPort);
-  sendRenoiseNoteOff(quinte, outIp, outPort);
-  delay(500);
-  
-  //sendRenoiseAccordOn(terz);
-  //sendRenoiseAccordOn(quinte);
-}
-
-void generateMoll(int cadence) {
-  Serial.print("Moll");
-  int note = 36;
-  int terz = 39;
-  int quinte = 43;
-  sendRenoiseAccordOn(note, outIp, outPort);
-  sendRenoiseAccordOn(terz, outIp, outPort);
-  sendRenoiseAccordOn(quinte, outIp, outPort);
-  delay(500);
-  sendRenoiseNoteOff(note, outIp, outPort);
-  sendRenoiseNoteOff(terz, outIp, outPort);
-  sendRenoiseNoteOff(quinte, outIp, outPort);
-  delay(500);
-  
-  //sendRenoiseAccordOn(terz);
-  //sendRenoiseAccordOn(quinte);
-}
-
 void setup(void)
 {
   Serial.begin(115200);
@@ -371,17 +317,6 @@ void mpu_loop()
     Serial.print(ypr[1] * 180/M_PI);
     Serial.print("\t");
     Serial.println(ypr[2] * 180/M_PI);
-
-    // Dur/Moll
-  float angle[3];
-  angle[1] = ypr[1] * 180/M_PI;
-
-    if (angle[1] >= 45.0 && angle[1] < 135) {
-      generateDur(0);
-    } 
-    if (angle[1] >= -45.0 && angle[1] < 45.0) {
-      generateMoll(0);
-    }
 #endif
 
 #ifdef OUTPUT_READABLE_REALACCEL
@@ -416,6 +351,70 @@ void mpu_loop()
   }
 }
 
+// Convert YPR data into angles
+// between -180° and +180°
+float *calcAngles(float *yprData) {
+  static float yprAngles[3]; // do not destroy array after return statement
+  for (int i = 0; i <= 3; i++)
+    yprAngles[i] = yprData[i] * 180/M_PI;
+  return yprAngles; // return pointer to angle data
+}
+
+void detectCadence(float *angle) {
+
+}
+
+void sendRenoiseNoteOn(int note, IPAddress outIp, int outPort) {
+  OSCMessage msg("/renoise/trigger/note_on");
+  msg.add((int)1).add((int)1).add(note).add((int)127);
+  Udp.beginPacket(outIp, outPort);
+  msg.send(Udp);
+  Udp.endPacket();
+  msg.empty();
+}
+
+void sendRenoiseNoteOff(int note, IPAddress outIp, int outPort) {  
+  OSCMessage msg("/renoise/trigger/note_off");
+  msg.add((int)1).add((int)1).add(note);
+  Udp.beginPacket(outIp, outPort);
+  msg.send(Udp);
+  Udp.endPacket();
+  msg.empty();
+}  
+
+void generateDur(int cadence) {
+  Serial.print("Dur");
+  int note = 36;
+  int terz = 40;
+  int quinte = 43;
+  sendRenoiseNoteOn(note, outIp, outPort);
+  sendRenoiseNoteOn(terz, outIp, outPort);
+  sendRenoiseNoteOn(quinte, outIp, outPort);
+  delay(500);
+  sendRenoiseNoteOff(note, outIp, outPort);
+  sendRenoiseNoteOff(terz, outIp, outPort);
+  sendRenoiseNoteOff(quinte, outIp, outPort);
+  delay(500);
+  
+  //sendRenoiseAccordOn(terz);
+  //sendRenoiseAccordOn(quinte);
+}
+
+void generateMoll(int cadence) {
+  Serial.print("Moll");
+  int note = 36;
+  int terz = 39;
+  int quinte = 43;
+  sendRenoiseNoteOn(note, outIp, outPort);
+  sendRenoiseNoteOn(terz, outIp, outPort);
+  sendRenoiseNoteOn(quinte, outIp, outPort);
+  delay(500);
+  sendRenoiseNoteOff(note, outIp, outPort);
+  sendRenoiseNoteOff(terz, outIp, outPort);
+  sendRenoiseNoteOff(quinte, outIp, outPort);
+  delay(500);
+}
+
 /**************************************************************************/
 /*
     Arduino loop function, called once 'setup' is complete (your own code
@@ -432,4 +431,18 @@ void loop(void)
   }
 
   mpu_loop();
+
+  float *mpuAngles = calcAngles(ypr);
+
+  detectCadence(mpuAngles);
+  // Dur/Moll
+
+  // YPR x == ??, y == 90, z == ??
+  if (mpuAngles[1] >= 45.0 && mpuAngles[1] < 135.0) {
+    generateDur(0);
+  }
+  // YPR x == ??, y == 0, z == ??
+  if (mpuAngles[1] >= -45.0 && mpuAngles[1] < 45.0) {
+    generateMoll(0);
+  }
 }
