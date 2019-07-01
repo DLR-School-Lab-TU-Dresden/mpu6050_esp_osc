@@ -74,6 +74,10 @@ int keynote = 60; // c2
 // Active angle = angle +- angleThreshold
 const int angleThreshold = 45;
 
+// Loop variables
+bool firstLoop = true;
+int previousTriad;
+
 // class default I2C address is 0x68
 // specific I2C addresses may be passed as a parameter here
 // AD0 low = 0x68 (default for SparkFun breakout and InvenSense evaluation board)
@@ -528,9 +532,6 @@ void sendTriad(int triad, bool noteOn) {
 */
 /**************************************************************************/
 
-bool firstLoop = true;
-long previousTriad;
-
 void loop(void) {
 
   // Connect to WiFi network
@@ -550,7 +551,7 @@ void loop(void) {
   float *mpuAngles = calcAngles(ypr);
   int triad = detectTriad(mpuAngles);
 
-  Serial.print(triad);
+  Serial.print(previousTriad);
   if (triad != previousTriad && !firstLoop && triad != 0) { // check whether triad has changed
     sendTriad(previousTriad, false); // mute previous triad
     sendTriad(triad, true); // play new triad
@@ -559,6 +560,7 @@ void loop(void) {
   
   Serial.print(triad);
   previousTriad = triad;
+  Serial.print(previousTriad);
 
   // Print raw data and cadence results
   Serial.print("ypr\t");
