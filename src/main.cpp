@@ -598,7 +598,7 @@ void loop(void) {
   char *triad = detectTriad(mpuAngles);
 
   // Indicate found triad with on-board LED
-  if (strcmp(triad, "T") == 0) { // basic/tonic position
+  if (strcmp(triad, "T") == 0 || strcmp(triad, "Tp") == 0) { // basic/tonic position
     digitalWrite(LED_PIN, false); // turn on LED
   }
   else if (strcmp(triad, "0") == 0) { // off position
