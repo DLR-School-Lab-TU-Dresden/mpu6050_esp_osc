@@ -402,49 +402,61 @@ float *calcAngles(float *yprData) {
 char *detectTriad(float *angles) {
   static char triad[3];
   // 1. T: Tonic (Tonika, Dur)
-  // y == 90, p == 90, r == +-0 
-  if ((angles[0] >= 90.0-angleThreshold && angles[0] < 90.0+angleThreshold) && (angles[1] >= 90.0-angleThreshold && angles[1] < 90.0+angleThreshold)) { // && (angles[2] >= 0.0-angleThreshold && angles[2] < 0.0+angleThreshold)) {
+  // y == -90, p == 90, R == -90 
+  if ((angles[0] >= -90.0-angleThreshold && angles[0] < -90.0+angleThreshold) && (angles[1] >= 90.0-angleThreshold && angles[1] < 90.0+angleThreshold) && (angles[2] >= -90.0-angleThreshold && angles[2] < -90.0+angleThreshold)) {
     strcpy(triad, "T");
     return triad;
   }
 
   // 2. Sp: Supertonic (Subdominantparallele, Moll)
-  // x == +-180, y == 0
-  else if (((angles[0] >= 180.0-angleThreshold && angles[0] <= 180.0) || (angles[0] < -180.0+angleThreshold && angles[0] >= -180.0)) && (angles[1] >= 0.0-angleThreshold && angles[1] < 0.0+angleThreshold)) {
+  // y == 0, P == 0, r == 0
+  else if ((angles[0] >= 0.0-angleThreshold && angles[0] < 0.0+angleThreshold) && (angles[1] >= 0.0-angleThreshold && angles[1] < 0.0+angleThreshold) && (angles[2] >= 0.0-angleThreshold && angles[2] < 0.0+angleThreshold)) {
     strcpy(triad, "Sp");
     return triad;
   }
 
   // 3. Dp: Mediant (Dominantparallele, Moll)
-  // y == 0, p == 0, r == 0
-  else if ((angles[0] >= 0.0-angleThreshold && angles[0] < 0.0+angleThreshold) && (angles[1] >= 0.0-angleThreshold && angles[1] < 0.0+angleThreshold)) {
+  // y == +-180, P == 0, r == 0
+  else if (((angles[0] >= 180.0-angleThreshold && angles[0] <= 180.0) || (angles[0] < -180.0+angleThreshold && angles[0] >= -180.0)) && (angles[1] >= 0.0-angleThreshold && angles[1] < 0.0+angleThreshold) && (angles[2] >= 0.0-angleThreshold && angles[2] < 0.0+angleThreshold)) {
     strcpy(triad, "Dp");
     return triad;
   }
 
   // 4. S: Subdominant (Subdominante, Dur)
-  // x == +-180, y == +-180
-   else if (((angles[0] >= 180.0-angleThreshold && angles[0] <= 180.0) || (angles[0] < -180.0+angleThreshold && angles[0] >= -180.0)) && ((angles[1] >= 180.0-angleThreshold && angles[1] <= 180.0) || (angles[1] < -180.0+angleThreshold && angles[1] >= -180.0))) {
+  // y == 0, P == 0, r == 90
+   else if ((angles[0] >= 0.0-angleThreshold && angles[0] < 0.0+angleThreshold) && (angles[1] >= 0.0-angleThreshold && angles[1] < 0.0+angleThreshold) && (angles[2] >= 90.0-angleThreshold && angles[2] < 90.0+angleThreshold)) {
     strcpy(triad, "S");
     return triad;
   }
 
   // 5. D: Dominant (Dominante, Dur)
-  // x == 0, y == +-180
-  else if ((angles[0] >= 0.0-angleThreshold && angles[0] < 0.0+angleThreshold) && ((angles[1] >= 180.0-angleThreshold && angles[1] <= 180.0) || (angles[1] < -180.0+angleThreshold && angles[1] >= -180.0))) {
+  // y == +-180, P == +-180, r == -90
+  else if (((angles[0] >= 180.0-angleThreshold && angles[0] <= 180.0) || (angles[0] < -180.0+angleThreshold && angles[0] >= -180.0)) && ((angles[1] >= 180.0-angleThreshold && angles[1] <= 180.0) || (angles[1] < -180.0+angleThreshold && angles[1] >= -180.0)) && (angles[2] >= -90.0-angleThreshold && angles[2] < -90.0+angleThreshold)) {
     strcpy(triad, "D");
     return triad;
   }
 
   // 6. Tp: Submediant (Tonikaparallele, Moll)
-  // y == 90, p == 0, r == 0
-  else if ((angles[0] >= 90.0-angleThreshold && angles[0] < 90.0+angleThreshold) && (angles[1] >= 0.0-angleThreshold && angles[1] < 0.0+angleThreshold)){ // && (angles[2] >= 0.0-angleThreshold && angles[2] < 0.0+angleThreshold)) {
+  // y == -90, p == 0, R == 0
+  else if ((angles[0] >= -90.0-angleThreshold && angles[0] < -90.0+angleThreshold) && (angles[1] >= 0.0-angleThreshold && angles[1] < 0.0+angleThreshold) && (angles[2] >= 0.0-angleThreshold && angles[2] < 0.0+angleThreshold)){
     strcpy(triad, "Tp");
     return triad;
   }
   else
     strcpy(triad, "0");
     return triad;
+}
+
+/*
+  Returns a "special value" calculated from the free DOF
+  of a triad position (only 2 DOF define a triad).
+
+  Can be used to manipulate effects for the played triad.
+*/
+int getSpecialValue(char *triad, float *mpuAngles) {
+  // not yet implemented
+  int value;
+  return value;
 }
 
 void sendRenoiseNoteOn(int note, IPAddress outIp, int outPort) {
@@ -550,6 +562,7 @@ void loop(void) {
   // Analyze MPU raw data
   float *mpuAngles = calcAngles(ypr);
   char *triad = detectTriad(mpuAngles);
+  int value = getSpecialValue(triad, mpuAngles);
 
   // Print raw data and cadence results
   Serial.print("\n\rypr\t");
