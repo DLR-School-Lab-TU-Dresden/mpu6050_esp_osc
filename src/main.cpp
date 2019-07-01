@@ -472,14 +472,43 @@ void sendTriad(char *triad, bool noteOn) {
   int first, third, fifth;
   // 1. T: Tonic (Tonika, Dur)
   if (strcmp(triad, "T") == 0) {
-    first = keynote + 12;
+    first = keynote + 0;
     third = keynote + 4;
     fifth = keynote + 7;
   }
+
+   // 2. Sp: Supertonic (Subdominantparallele, Moll)
+  else if (strcmp(triad, "Sp") == 0) {
+    first = keynote + 2;
+    third = keynote + 5;
+    fifth = keynote + 9;
+  }
+
+  // 3. Dp: Mediant (Dominantparallele, Moll)
+  else if (strcmp(triad, "Dp") == 0) {
+    first = keynote + 4;
+    third = keynote + 7;
+    fifth = keynote - 1;
+  }
+
+  // 4. S: Subdominant (Subdominante, Dur)
+  else if (strcmp(triad, "S") == 0) {
+    first = keynote + 5;
+    third = keynote + 9;
+    fifth = keynote + 0;
+  }
+
+  // 5. D: Dominant (Dominante, Dur)
+  else if (strcmp(triad, "D") == 0) {
+    first = keynote + 7;
+    third = keynote - 1;
+    fifth = keynote + 2;
+  }
+
   // 6. Tp: Submediant (Tonikaparallele, Moll)
   else if (strcmp(triad, "Tp") == 0) {
     first = keynote + 9;
-    third = keynote;
+    third = keynote + 0;
     fifth = keynote + 4;
   }
 
