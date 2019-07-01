@@ -74,6 +74,10 @@ int keynote = 72; // c2
 // Active angle = angle +- angleThreshold
 const int angleThreshold = 45;
 
+// Global loop variables
+bool firstLoop = true;
+char previousTriad[3];
+
 // class default I2C address is 0x68
 // specific I2C addresses may be passed as a parameter here
 // AD0 low = 0x68 (default for SparkFun breakout and InvenSense evaluation board)
@@ -499,9 +503,6 @@ void sendTriad(char *triad, bool noteOn) {
 */
 /**************************************************************************/
 
-bool firstLoop = true;
-char previousTriad[3];
-
 void loop(void) {
 
   // Connect to WiFi network
@@ -521,22 +522,31 @@ void loop(void) {
   float *mpuAngles = calcAngles(ypr);
   char *triad = detectTriad(mpuAngles);
 
-  Serial.print(triad);
-  Serial.print(previousTriad);
-  if (strcmp(triad, previousTriad) != 0 && !firstLoop && strcmp(triad, "0") != 0) { // check whether triad has changed
-    sendTriad(previousTriad, false); // mute previous triad
-    sendTriad(triad, true); // play new triad
-  }
-
-  strcpy(previousTriad, triad);
-
   // Print raw data and cadence results
-  Serial.print("ypr\t");
+  Serial.print("\n\rypr\t");
   for (int i = 0; i <= 2; i++) {
     Serial.print(mpuAngles[i]);
     Serial.print("\t");
   }
-  Serial.println(triad);
+  Serial.print(triad);
+
+// Send only triad if it has changed
+  if (strcmp(triad, previousTriad) != 0 && strcmp(triad, "0") != 0) { // check whether triad has changed
+    if (!firstLoop) {
+      sendTriad(previousTriad, false); // mute previous triad
+      Serial.print("\t");
+      Serial.print("mute");
+    }
+    else {
+      Serial.print("\t");
+    }
+    sendTriad(triad, true); // play new triad
+    Serial.print("\t");
+    Serial.print("play");
+  }
+
+  // Save triad for next loop iteration
+  strcpy(previousTriad, triad);
 
   //delay(100); // Too long delays cause "FIFO overflow" in mpu_loop() function
   firstLoop = false;
