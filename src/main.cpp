@@ -68,11 +68,11 @@ THE SOFTWARE.
 const bool DEBUG_OFFLINE = false;
 
 // Tonic note for cadence
-int keynote = 72; // c2
+int keynote = 60; // c2
 
 // Threshold value for distinction between NoteOn/NoteOff
 // Active angle = angle +- angleThreshold
-const int angleThreshold = 45;
+const int angleThreshold = 37.5;
 
 // Global loop variables
 bool firstLoop = true;
@@ -561,7 +561,7 @@ void loop(void) {
 
 // Send only triad if it has changed
   if (strcmp(triad, previousTriad) != 0) { // check whether triad has changed
-    if (!firstLoop) {
+    if (!firstLoop && strcmp(previousTriad, "0") != 0) { // don't mute a previous "0" triad
       sendTriad(previousTriad, false); // mute previous triad
       Serial.print("\t");
       Serial.print("mute");
