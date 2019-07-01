@@ -248,7 +248,11 @@ void setup(void)
   else {
     Serial.println("Offline debug mode. Not going to try to establish WiFi connection.");
   }
+
+  // LED
   pinMode(LED_PIN, OUTPUT);
+
+  // MPU6050
   mpu_setup();
 }
 
