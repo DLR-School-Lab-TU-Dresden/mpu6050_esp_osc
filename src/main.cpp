@@ -462,8 +462,31 @@ char *detectTriad(float *angles) {
 */
 int *getEffectValues(char *triad, float *mpuAngles) {
   // not yet implemented
-  int value[2];
-  return value;
+  int values[2];
+
+  if (strcmp(triad, "T") == 0) {
+    // R
+  }
+  else if (strcmp(triad, "Sp") == 0) {
+    // P
+  }
+  else if (strcmp(triad, "Dp") == 0) {
+    // P
+  }
+  else if (strcmp(triad, "S") == 0) {
+    // P
+  }
+  else if (strcmp(triad, "D") == 0) {
+    // P
+  }
+  else if (strcmp(triad, "Sp") == 0) {
+    // R
+  }
+  else {
+    // 0
+  }
+
+  return values;
 }
 
 void sendRenoiseNoteOn(int note, IPAddress outIp, int outPort) {
@@ -570,16 +593,16 @@ void loop(void) {
   float *mpuAngles = calcAngles(ypr);
   char *triad = detectTriad(mpuAngles);
 
-  // Indicate basic positions with LED
-  if (strcmp(triad, "T") == 0) {
+  // Indicate found triad with on-board LED
+  if (strcmp(triad, "T") == 0) { // basic/tonic position
     digitalWrite(LED_PIN, false); // turn on LED
   }
-  else if (strcmp(triad, "Tp") == 0) {
-    blinkstate = !blinkstate;
-    digitalWrite(LED_PIN, blinkstate); // let LED blink
+  else if (strcmp(triad, "0") == 0) { // off position
+    digitalWrite(LED_PIN, true); // turn off LED
   }
   else {
-    digitalWrite(LED_PIN, true);
+    blinkstate = !blinkstate; // every other triad
+    digitalWrite(LED_PIN, blinkstate); // let LED blink
   }
 
   int *effectValues = getEffectValues(triad, mpuAngles);
