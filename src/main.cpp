@@ -64,12 +64,12 @@ THE SOFTWARE.
     #include "Wire.h"
 #endif
 
+// Skip connecting to WiFi for faster debugging
+const bool DEBUG_OFFLINE = false;
+
 // Wemos D1 mini pin for blue LED
 const int LED_PIN = 2;
 bool blinkstate = true;
-
-// Skip connecting to WiFi for faster debugging
-const bool DEBUG_OFFLINE = true;
 
 // Tonic note for cadence
 int keynote = 60; // c2
