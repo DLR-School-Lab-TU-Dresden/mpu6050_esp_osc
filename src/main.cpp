@@ -64,9 +64,28 @@ THE SOFTWARE.
     #include "Wire.h"
 #endif
 
+// Custom includes
+#include <NeoPixelBus.h>
+
 // Wemos D1 mini pin for blue LED
 const int LED_PIN = 2;
 bool blinkstate = true;
+
+// RGB LED
+const uint16_t PixelCount = 1; // 1 pixel
+const uint8_t DotClockPin = 5; // I2C clock
+const uint8_t DotDataPin = 4; // I2C data
+const uint8_t colorSaturation = 128;
+NeoPixelBus<DotStarBgrFeature, DotStarMethod> strip(PixelCount, DotClockPin, DotDataPin);
+
+// Colour definitions
+RgbColor red(colorSaturation, 0, 0);
+RgbColor green(0, colorSaturation, 0);
+RgbColor blue(0, 0, colorSaturation);
+RgbColor white(colorSaturation);
+RgbColor black(0);
+
+// Definitions for WS2812 shield
 
 // Skip connecting to WiFi for faster debugging
 const bool DEBUG_OFFLINE = true;
@@ -248,7 +267,14 @@ void setup(void)
   else {
     Serial.println("Offline debug mode. Not going to try to establish WiFi connection.");
   }
+
+  // LEDs
   pinMode(LED_PIN, OUTPUT);
+  // This resets all the neopixels to an off state
+  strip.Begin();
+  strip.ClearTo(black);
+  strip.Show();
+
   mpu_setup();
 }
 
@@ -621,14 +647,20 @@ void loop(void) {
       sendTriad(previousTriad, false); // mute previous triad
       Serial.print("\t");
       Serial.print("mute");
+
+      strip.SetPixelColor(0, red);
+      strip.Show();
     }
     else {
-      Serial.print("\t");
+      Serial.print("\t"); // if mute not needed, jump one tab forward anyway
     }
     if (strcmp(triad, "0") != 0) { // play new triad except for "0" triad (= not defined)
       sendTriad(triad, true);
       Serial.print("\t");
       Serial.print("play");
+
+      strip.SetPixelColor(0, green);
+      strip.Show();
     }
   }
 
