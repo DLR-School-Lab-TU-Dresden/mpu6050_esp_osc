@@ -531,7 +531,7 @@ void loop(void) {
   Serial.print(triad);
 
 // Send only triad if it has changed
-  if (strcmp(triad, previousTriad) != 0 && strcmp(triad, "0") != 0) { // check whether triad has changed
+  if (strcmp(triad, previousTriad) != 0) { // check whether triad has changed
     if (!firstLoop) {
       sendTriad(previousTriad, false); // mute previous triad
       Serial.print("\t");
@@ -540,9 +540,11 @@ void loop(void) {
     else {
       Serial.print("\t");
     }
-    sendTriad(triad, true); // play new triad
-    Serial.print("\t");
-    Serial.print("play");
+    if (strcmp(triad, "0") != 0) { // play new triad except for "0" triad (= not defined)
+      sendTriad(triad, true);
+      Serial.print("\t");
+      Serial.print("play");
+    }
   }
 
   // Save triad for next loop iteration
