@@ -65,7 +65,7 @@ THE SOFTWARE.
 #endif
 
 // Skip connecting to WiFi for faster debugging
-const bool DEBUG_OFFLINE = true;
+const bool DEBUG_OFFLINE = false;
 
 // Tonic note for cadence
 int keynote = 72; // c2
@@ -224,14 +224,14 @@ void setup(void)
 
   //WiFiManager
   //Local intialization. Once its business is done, there is no need to keep it around
-  WiFiManager wifiManager;
+  if (!DEBUG_OFFLINE) {
+    WiFiManager wifiManager;
   //reset saved settings
   //wifiManager.resetSettings();
 
   //fetches ssid and pass from eeprom and tries to connect
   //if it does not connect it starts an access point with the specified name
   //and goes into a blocking loop awaiting configuration
-  if (!DEBUG_OFFLINE) {
     wifiManager.autoConnect(DEVICE_NAME);
 
     Serial.print(F("WiFi connected! IP address: "));
@@ -521,11 +521,11 @@ void loop(void) {
   float *mpuAngles = calcAngles(ypr);
   char *triad = detectTriad(mpuAngles);
 
-  if (strcmp(triad, previousTriad) != 0 && !firstLoop) { // check whether triad has changed
-    if (strcmp(triad, "0") != 0) { // on-position
-      sendTriad(triad, true); // play new triad
-      sendTriad(previousTriad, false); // mute previous triad
-    }
+  Serial.print(triad);
+  Serial.print(previousTriad);
+  if (strcmp(triad, previousTriad) != 0 && !firstLoop && strcmp(triad, "0") != 0) { // check whether triad has changed
+    sendTriad(previousTriad, false); // mute previous triad
+    sendTriad(triad, true); // play new triad
   }
 
   strcpy(previousTriad, triad);
