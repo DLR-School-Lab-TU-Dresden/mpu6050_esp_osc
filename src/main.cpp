@@ -188,10 +188,10 @@ void mpu_setup()
   devStatus = mpu.dmpInitialize();
 
   // supply your own gyro offsets here, scaled for min sensitivity
-  mpu.setXGyroOffset(42);
-  mpu.setYGyroOffset(-60);
-  mpu.setZGyroOffset(51);
-  mpu.setZAccelOffset(801); // 1688 factory default for my test chip
+  mpu.setXGyroOffset(46);
+  mpu.setYGyroOffset(-66);
+  mpu.setZGyroOffset(54);
+  mpu.setZAccelOffset(795); // 1688 factory default for my test chip
 
   // make sure it worked (returns 0 if so)
   if (devStatus == 0) {
@@ -402,7 +402,7 @@ float *calcAngles(float *yprData) {
 char *detectTriad(float *angles) {
   static char triad[3];
   // 1. T: Tonic (Tonika, Dur)
-  // YPR x == 90, y == 90
+  // y == 90, p == 90, r == +-0 
   if ((angles[0] >= 90.0-angleThreshold && angles[0] < 90.0+angleThreshold) && (angles[1] >= 90.0-angleThreshold && angles[1] < 90.0+angleThreshold)) { // && (angles[2] >= 0.0-angleThreshold && angles[2] < 0.0+angleThreshold)) {
     strcpy(triad, "T");
     return triad;
@@ -416,7 +416,7 @@ char *detectTriad(float *angles) {
   }
 
   // 3. Dp: Mediant (Dominantparallele, Moll)
-  // x == 0, y == 0
+  // y == 0, p == 0, r == 0
   else if ((angles[0] >= 0.0-angleThreshold && angles[0] < 0.0+angleThreshold) && (angles[1] >= 0.0-angleThreshold && angles[1] < 0.0+angleThreshold)) {
     strcpy(triad, "Dp");
     return triad;
@@ -437,7 +437,7 @@ char *detectTriad(float *angles) {
   }
 
   // 6. Tp: Submediant (Tonikaparallele, Moll)
-  // YPR x == 90, y == 0
+  // y == 90, p == 0, r == 0
   else if ((angles[0] >= 90.0-angleThreshold && angles[0] < 90.0+angleThreshold) && (angles[1] >= 0.0-angleThreshold && angles[1] < 0.0+angleThreshold)){ // && (angles[2] >= 0.0-angleThreshold && angles[2] < 0.0+angleThreshold)) {
     strcpy(triad, "Tp");
     return triad;
