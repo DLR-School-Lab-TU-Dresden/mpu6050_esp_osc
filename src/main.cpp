@@ -401,44 +401,47 @@ float *calcAngles(float *yprData) {
 */
 char *detectTriad(float *angles) {
   static char triad[3];
+  // y: yaw, p: pitch, r: roll
+  // capitalized: free DOF which can be used for other effects
+
   // 1. T: Tonic (Tonika, Dur)
   // y == -90, p == 90, R == -90 
-  if ((angles[0] >= -90.0-angleThreshold && angles[0] < -90.0+angleThreshold) && (angles[1] >= 90.0-angleThreshold && angles[1] < 90.0+angleThreshold) && (angles[2] >= -90.0-angleThreshold && angles[2] < -90.0+angleThreshold)) {
+  if ((angles[0] >= -90.0-angleThreshold && angles[0] < -90.0+angleThreshold) && (angles[1] >= 90.0-angleThreshold && angles[1] < 90.0+angleThreshold)) {
     strcpy(triad, "T");
     return triad;
   }
 
   // 2. Sp: Supertonic (Subdominantparallele, Moll)
   // y == 0, P == 0, r == 0
-  else if ((angles[0] >= 0.0-angleThreshold && angles[0] < 0.0+angleThreshold) && (angles[1] >= 0.0-angleThreshold && angles[1] < 0.0+angleThreshold) && (angles[2] >= 0.0-angleThreshold && angles[2] < 0.0+angleThreshold)) {
+  else if ((angles[0] >= 0.0-angleThreshold && angles[0] < 0.0+angleThreshold) && (angles[2] >= 0.0-angleThreshold && angles[2] < 0.0+angleThreshold)) {
     strcpy(triad, "Sp");
     return triad;
   }
 
   // 3. Dp: Mediant (Dominantparallele, Moll)
   // y == +-180, P == 0, r == 0
-  else if (((angles[0] >= 180.0-angleThreshold && angles[0] <= 180.0) || (angles[0] < -180.0+angleThreshold && angles[0] >= -180.0)) && (angles[1] >= 0.0-angleThreshold && angles[1] < 0.0+angleThreshold) && (angles[2] >= 0.0-angleThreshold && angles[2] < 0.0+angleThreshold)) {
+  else if (((angles[0] >= 180.0-angleThreshold && angles[0] <= 180.0) || (angles[0] < -180.0+angleThreshold && angles[0] >= -180.0)) && (angles[2] >= 0.0-angleThreshold && angles[2] < 0.0+angleThreshold)) {
     strcpy(triad, "Dp");
     return triad;
   }
 
   // 4. S: Subdominant (Subdominante, Dur)
   // y == 0, P == 0, r == 90
-   else if ((angles[0] >= 0.0-angleThreshold && angles[0] < 0.0+angleThreshold) && (angles[1] >= 0.0-angleThreshold && angles[1] < 0.0+angleThreshold) && (angles[2] >= 90.0-angleThreshold && angles[2] < 90.0+angleThreshold)) {
+   else if ((angles[0] >= 0.0-angleThreshold && angles[0] < 0.0+angleThreshold) && (angles[2] >= 90.0-angleThreshold && angles[2] < 90.0+angleThreshold)) {
     strcpy(triad, "S");
     return triad;
   }
 
   // 5. D: Dominant (Dominante, Dur)
   // y == +-180, P == +-180, r == -90
-  else if (((angles[0] >= 180.0-angleThreshold && angles[0] <= 180.0) || (angles[0] < -180.0+angleThreshold && angles[0] >= -180.0)) && ((angles[1] >= 180.0-angleThreshold && angles[1] <= 180.0) || (angles[1] < -180.0+angleThreshold && angles[1] >= -180.0)) && (angles[2] >= -90.0-angleThreshold && angles[2] < -90.0+angleThreshold)) {
+  else if (((angles[0] >= 180.0-angleThreshold && angles[0] <= 180.0) || (angles[0] < -180.0+angleThreshold && angles[0] >= -180.0)) && (angles[2] >= -90.0-angleThreshold && angles[2] < -90.0+angleThreshold)) {
     strcpy(triad, "D");
     return triad;
   }
 
   // 6. Tp: Submediant (Tonikaparallele, Moll)
   // y == -90, p == 0, R == 0
-  else if ((angles[0] >= -90.0-angleThreshold && angles[0] < -90.0+angleThreshold) && (angles[1] >= 0.0-angleThreshold && angles[1] < 0.0+angleThreshold) && (angles[2] >= 0.0-angleThreshold && angles[2] < 0.0+angleThreshold)){
+  else if ((angles[0] >= -90.0-angleThreshold && angles[0] < -90.0+angleThreshold) && (angles[1] >= 0.0-angleThreshold && angles[1] < 0.0+angleThreshold)){
     strcpy(triad, "Tp");
     return triad;
   }
