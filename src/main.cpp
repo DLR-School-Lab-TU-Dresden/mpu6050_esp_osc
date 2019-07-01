@@ -68,7 +68,7 @@ THE SOFTWARE.
 const bool DEBUG_OFFLINE = true;
 
 // Tonic note for cadence
-int keynote = 36; // c2
+int keynote = 72; // c2
 
 // Threshold value for distinction between NoteOn/NoteOff
 // Active angle = angle +- angleThreshold
@@ -398,20 +398,43 @@ float *calcAngles(float *yprData) {
 char *detectTriad(float *angles) {
   static char triad[3];
   // 1. T: Tonic (Tonika, Dur)
-  // YPR x == 90, y == 90, z == 0
-  if ((angles[0] >= 90.0-angleThreshold && angles[0] < 90.0+angleThreshold) && (angles[1] >= 90.0-angleThreshold && angles[1] < 90.0+angleThreshold) && (angles[2] >= 0.0-angleThreshold && angles[2] < 0.0+angleThreshold)) {
+  // YPR x == 90, y == 90
+  if ((angles[0] >= 90.0-angleThreshold && angles[0] < 90.0+angleThreshold) && (angles[1] >= 90.0-angleThreshold && angles[1] < 90.0+angleThreshold)) { // && (angles[2] >= 0.0-angleThreshold && angles[2] < 0.0+angleThreshold)) {
     strcpy(triad, "T");
     return triad;
   }
 
   // 2. Sp: Supertonic (Subdominantparallele, Moll)
+  // x == +-180, y == 0
+  else if (((angles[0] >= 180.0-angleThreshold && angles[0] <= 180.0) || (angles[0] < -180.0+angleThreshold && angles[0] >= -180.0)) && (angles[1] >= 0.0-angleThreshold && angles[1] < 0.0+angleThreshold)) {
+    strcpy(triad, "Sp");
+    return triad;
+  }
+
   // 3. Dp: Mediant (Dominantparallele, Moll)
+  // x == 0, y == 0
+  else if ((angles[0] >= 0.0-angleThreshold && angles[0] < 0.0+angleThreshold) && (angles[1] >= 0.0-angleThreshold && angles[1] < 0.0+angleThreshold)) {
+    strcpy(triad, "Dp");
+    return triad;
+  }
+
   // 4. S: Subdominant (Subdominante, Dur)
+  // x == +-180, y == +-180
+   else if (((angles[0] >= 180.0-angleThreshold && angles[0] <= 180.0) || (angles[0] < -180.0+angleThreshold && angles[0] >= -180.0)) && ((angles[1] >= 180.0-angleThreshold && angles[1] <= 180.0) || (angles[1] < -180.0+angleThreshold && angles[1] >= -180.0))) {
+    strcpy(triad, "S");
+    return triad;
+  }
+
   // 5. D: Dominant (Dominante, Dur)
+  // x == 0, y == +-180
+  else if ((angles[0] >= 0.0-angleThreshold && angles[0] < 0.0+angleThreshold) && ((angles[1] >= 180.0-angleThreshold && angles[1] <= 180.0) || (angles[1] < -180.0+angleThreshold && angles[1] >= -180.0))) {
+    strcpy(triad, "D");
+    return triad;
+  }
 
   // 6. Tp: Submediant (Tonikaparallele, Moll)
-  // YPR x == 90, y == 0, z == 0
-  else if ((angles[0] >= 90.0-angleThreshold && angles[0] < 90.0+angleThreshold) && (angles[1] >= 0.0-angleThreshold && angles[1] < 0.0+angleThreshold) && (angles[2] >= 0.0-angleThreshold && angles[2] < 0.0+angleThreshold)) {
+  // YPR x == 90, y == 0
+  else if ((angles[0] >= 90.0-angleThreshold && angles[0] < 90.0+angleThreshold) && (angles[1] >= 0.0-angleThreshold && angles[1] < 0.0+angleThreshold)){ // && (angles[2] >= 0.0-angleThreshold && angles[2] < 0.0+angleThreshold)) {
     strcpy(triad, "Tp");
     return triad;
   }
@@ -422,7 +445,7 @@ char *detectTriad(float *angles) {
 
 void sendRenoiseNoteOn(int note, IPAddress outIp, int outPort) {
   OSCMessage msg("/renoise/trigger/note_on");
-  msg.add((int)1).add((int)1).add(note).add((int)127);
+  msg.add((int)1).add((int)2).add(note).add((int)127);
   Udp.beginPacket(outIp, outPort);
   msg.send(Udp);
   Udp.endPacket();
@@ -431,7 +454,7 @@ void sendRenoiseNoteOn(int note, IPAddress outIp, int outPort) {
 
 void sendRenoiseNoteOff(int note, IPAddress outIp, int outPort) {  
   OSCMessage msg("/renoise/trigger/note_off");
-  msg.add((int)1).add((int)1).add(note);
+  msg.add((int)1).add((int)2).add(note);
   Udp.beginPacket(outIp, outPort);
   msg.send(Udp);
   Udp.endPacket();
@@ -497,16 +520,12 @@ void loop(void) {
   // Analyze MPU raw data
   float *mpuAngles = calcAngles(ypr);
   char *triad = detectTriad(mpuAngles);
-  if (!firstLoop) {
-    sendTriad(previousTriad, false); // mute previous triad
-  }
 
-  // Check whether MPU is in off position
-  if (strcmp(triad, "0") != 0) { // on position
-    sendTriad(triad, true); // play new triad
-  }
-  else { // off position
-    sendTriad(triad, false);
+  if (strcmp(triad, previousTriad) != 0 && !firstLoop) { // check whether triad has changed
+    if (strcmp(triad, "0") != 0) { // on-position
+      sendTriad(triad, true); // play new triad
+      sendTriad(previousTriad, false); // mute previous triad
+    }
   }
 
   strcpy(previousTriad, triad);
