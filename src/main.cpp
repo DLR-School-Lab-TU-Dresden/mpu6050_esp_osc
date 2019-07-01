@@ -68,7 +68,7 @@ THE SOFTWARE.
 const bool DEBUG_OFFLINE = false;
 
 // Tonic note for cadence
-int keynote = 72; // c2
+int keynote = 60; // c2
 
 // Threshold value for distinction between NoteOn/NoteOff
 // Active angle = angle +- angleThreshold
@@ -395,51 +395,51 @@ float *calcAngles(float *yprData) {
 /*
   Detect triad of the cadence from yaw/pitch/roll angle.
 */
-char *detectTriad(float *angles) {
-  static char triad[3];
+int detectTriad(float *angles) {
+  static int triad;
   // 1. T: Tonic (Tonika, Dur)
   // YPR x == 90, y == 90
   if ((angles[0] >= 90.0-angleThreshold && angles[0] < 90.0+angleThreshold) && (angles[1] >= 90.0-angleThreshold && angles[1] < 90.0+angleThreshold)) { // && (angles[2] >= 0.0-angleThreshold && angles[2] < 0.0+angleThreshold)) {
-    strcpy(triad, "T");
+    triad = 1;
     return triad;
   }
 
   // 2. Sp: Supertonic (Subdominantparallele, Moll)
   // x == +-180, y == 0
   else if (((angles[0] >= 180.0-angleThreshold && angles[0] <= 180.0) || (angles[0] < -180.0+angleThreshold && angles[0] >= -180.0)) && (angles[1] >= 0.0-angleThreshold && angles[1] < 0.0+angleThreshold)) {
-    strcpy(triad, "Sp");
+    triad = 2;
     return triad;
   }
 
   // 3. Dp: Mediant (Dominantparallele, Moll)
   // x == 0, y == 0
   else if ((angles[0] >= 0.0-angleThreshold && angles[0] < 0.0+angleThreshold) && (angles[1] >= 0.0-angleThreshold && angles[1] < 0.0+angleThreshold)) {
-    strcpy(triad, "Dp");
+    triad = 3;
     return triad;
   }
 
   // 4. S: Subdominant (Subdominante, Dur)
   // x == +-180, y == +-180
    else if (((angles[0] >= 180.0-angleThreshold && angles[0] <= 180.0) || (angles[0] < -180.0+angleThreshold && angles[0] >= -180.0)) && ((angles[1] >= 180.0-angleThreshold && angles[1] <= 180.0) || (angles[1] < -180.0+angleThreshold && angles[1] >= -180.0))) {
-    strcpy(triad, "S");
+    triad = 4;
     return triad;
   }
 
   // 5. D: Dominant (Dominante, Dur)
   // x == 0, y == +-180
   else if ((angles[0] >= 0.0-angleThreshold && angles[0] < 0.0+angleThreshold) && ((angles[1] >= 180.0-angleThreshold && angles[1] <= 180.0) || (angles[1] < -180.0+angleThreshold && angles[1] >= -180.0))) {
-    strcpy(triad, "D");
+    triad = 5;
     return triad;
   }
 
   // 6. Tp: Submediant (Tonikaparallele, Moll)
   // YPR x == 90, y == 0
   else if ((angles[0] >= 90.0-angleThreshold && angles[0] < 90.0+angleThreshold) && (angles[1] >= 0.0-angleThreshold && angles[1] < 0.0+angleThreshold)){ // && (angles[2] >= 0.0-angleThreshold && angles[2] < 0.0+angleThreshold)) {
-    strcpy(triad, "Tp");
+    triad = 6;
     return triad;
   }
   else
-    strcpy(triad, "0");
+    triad = 0;
     return triad;
 }
 
@@ -464,16 +464,45 @@ void sendRenoiseNoteOff(int note, IPAddress outIp, int outPort) {
 /*
   Send triad as OSC messages to ReNoise.
 */
-void sendTriad(char *triad, bool noteOn) {
+void sendTriad(int triad, bool noteOn) {
   int first, third, fifth;
   // 1. T: Tonic (Tonika, Dur)
-  if (strcmp(triad, "T") == 0) {
+  if (triad == 1) {
     first = keynote + 12;
     third = keynote + 4;
     fifth = keynote + 7;
   }
+
+  // 2. Sp: Supertonic (Subdominantparallele, Moll)
+  else if (triad == 2) {
+    first = keynote + 5;
+    third = keynote + 8;
+    fifth = keynote;
+  }
+
+  // 3. Dp: Mediant (Dominantparallele, Moll)
+  else if (triad == 3) {
+    first = keynote + 4;
+    third = keynote + 8;
+    fifth = keynote + 11;
+  }
+
+  // 4. S: Subdominant (Subdominante, Dur)
+  else if (triad == 4) {
+    first = keynote + 4;
+    third = keynote + 9;
+    fifth = keynote + 11;
+  }
+
+  // 5. D: Dominant (Dominante, Dur)
+  else if (triad == 5) {
+    first = keynote + 7;
+    third = keynote + 11;
+    fifth = keynote - 1;
+  }
+
   // 6. Tp: Submediant (Tonikaparallele, Moll)
-  else if (strcmp(triad, "Tp") == 0) {
+  else if (triad == 6) {
     first = keynote + 9;
     third = keynote;
     fifth = keynote + 4;
@@ -500,7 +529,7 @@ void sendTriad(char *triad, bool noteOn) {
 /**************************************************************************/
 
 bool firstLoop = true;
-char previousTriad[3];
+long previousTriad;
 
 void loop(void) {
 
@@ -519,16 +548,17 @@ void loop(void) {
 
   // Analyze MPU raw data
   float *mpuAngles = calcAngles(ypr);
-  char *triad = detectTriad(mpuAngles);
+  int triad = detectTriad(mpuAngles);
 
   Serial.print(triad);
-  Serial.print(previousTriad);
-  if (strcmp(triad, previousTriad) != 0 && !firstLoop && strcmp(triad, "0") != 0) { // check whether triad has changed
+  if (triad != previousTriad && !firstLoop && triad != 0) { // check whether triad has changed
     sendTriad(previousTriad, false); // mute previous triad
     sendTriad(triad, true); // play new triad
+    Serial.print("Sent.");
   }
-
-  strcpy(previousTriad, triad);
+  
+  Serial.print(triad);
+  previousTriad = triad;
 
   // Print raw data and cadence results
   Serial.print("ypr\t");
