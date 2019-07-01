@@ -64,8 +64,12 @@ THE SOFTWARE.
     #include "Wire.h"
 #endif
 
+// Wemos D1 mini pin for blue LED
+const int LED_PIN = 2;
+bool blinkstate = true;
+
 // Skip connecting to WiFi for faster debugging
-const bool DEBUG_OFFLINE = false;
+const bool DEBUG_OFFLINE = true;
 
 // Tonic note for cadence
 int keynote = 60; // c2
@@ -244,7 +248,7 @@ void setup(void)
   else {
     Serial.println("Offline debug mode. Not going to try to establish WiFi connection.");
   }
-
+  pinMode(LED_PIN, OUTPUT);
   mpu_setup();
 }
 
@@ -396,7 +400,7 @@ float *calcAngles(float *yprData) {
   return yprAngles; // return pointer to angle data
 }
 
-/*
+/*pio 
   Detect triad of the cadence from yaw/pitch/roll angle.
 */
 char *detectTriad(float *angles) {
@@ -456,9 +460,9 @@ char *detectTriad(float *angles) {
 
   Can be used to manipulate effects for the played triad.
 */
-int getSpecialValue(char *triad, float *mpuAngles) {
+int *getEffectValues(char *triad, float *mpuAngles) {
   // not yet implemented
-  int value;
+  int value[2];
   return value;
 }
 
@@ -565,7 +569,20 @@ void loop(void) {
   // Analyze MPU raw data
   float *mpuAngles = calcAngles(ypr);
   char *triad = detectTriad(mpuAngles);
-  int value = getSpecialValue(triad, mpuAngles);
+
+  // Indicate basic positions with LED
+  if (strcmp(triad, "T") == 0) {
+    digitalWrite(LED_PIN, false); // turn on LED
+  }
+  else if (strcmp(triad, "Tp") == 0) {
+    blinkstate = !blinkstate;
+    digitalWrite(LED_PIN, blinkstate); // let LED blink
+  }
+  else {
+    digitalWrite(LED_PIN, true);
+  }
+
+  int *effectValues = getEffectValues(triad, mpuAngles);
 
   // Print raw data and cadence results
   Serial.print("\n\rypr\t");
